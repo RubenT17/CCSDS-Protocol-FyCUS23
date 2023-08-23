@@ -68,6 +68,8 @@ HAL_StatusTypeDef tf_packet_Decode(uint8_t *buffer_in, uint32_t buffer_length,  
 		tfdf->constr_rule = (buffer_in[7+tfph->vc_length] & 0b11100000) >>5;
 		tfdf->protocol_id = buffer_in[7+tfph->vc_length] & 0b00011111;
 
+
+		if(tfph->length - TF_PACKET_PRIMARY_BASE_HEADER_SIZE - tfph->vc_length - TF_PACKET_DATA_HEADER_SIZE - TF_PACKET_ECF_SIZE < 0)	return HAL_ERROR;
 		memcpy(tfdf->data, &buffer_in[8+tfph->vc_length], tfph->length - TF_PACKET_PRIMARY_BASE_HEADER_SIZE - tfph->vc_length - TF_PACKET_DATA_HEADER_SIZE - TF_PACKET_ECF_SIZE);
 
 #ifdef STM32_MCU
@@ -85,6 +87,7 @@ HAL_StatusTypeDef tf_packet_Decode(uint8_t *buffer_in, uint32_t buffer_length,  
 	{
 		tfdf->constr_rule = (buffer_in[4] & 0b11100000) >>5;
 		tfdf->protocol_id = buffer_in[4] & 0b00011111;
+		if(buffer_length - TF_PACKET_PRIMARY_TRUNCATED_HEADER_SIZE - TF_PACKET_DATA_HEADER_SIZE - TF_PACKET_ECF_SIZE < 0)	return HAL_ERROR;
 		memcpy(tfdf->data, &buffer_in[5], buffer_length - TF_PACKET_PRIMARY_TRUNCATED_HEADER_SIZE - TF_PACKET_DATA_HEADER_SIZE - TF_PACKET_ECF_SIZE);
 
 #ifdef STM32_MCU
@@ -106,14 +109,9 @@ HAL_StatusTypeDef tf_packet_Decode(uint8_t *buffer_in, uint32_t buffer_length,  
 
 HAL_StatusTypeDef tf_packet_Packetize(uint8_t data_length, tfph_packet_t *tfph, tfdf_packet_t *tfdf, uint8_t *buffer_out)
 {
-	buffer_out[0] = (tfph->tfvn<<4) | ((tfph->scid & 0xF000)>>12);
-	buffer_out[1] = (tfph->scid & 0x0FF0)>>4;
-	buffer_out[2] = ((tfph->scid & 0x000F)<<4) | (tfph->source_dest_id<<3) | ((tfph->vcid & 0b111000)>>3);
-	buffer_out[3] = ((tfph->vcid & 0b000111)<<5) | (tfph->mapid<<1) | (tfph->end_flag);
-
 	if(!tfph->end_flag)
 	{
-		if(tfph->length > TF_PACKET_MAX_LENGTH)	return HAL_ERROR;
+		if(tfph->length > TF_PACKET_MAX_SIZE)	return HAL_ERROR;
 
 		buffer_out[4] = (tfph->length & 0xFF00)>>8;
 		buffer_out[5] = tfph->length & 0x00FF;
@@ -137,8 +135,9 @@ HAL_StatusTypeDef tf_packet_Packetize(uint8_t data_length, tfph_packet_t *tfph, 
 
 	else
 	{
-		buffer_out[7] = (tfdf->constr_rule<<5) | tfdf->protocol_id;
+		if(data_length > TF_PACKET_DATA_MAX_SIZE)		return HAL_ERROR;
 
+		buffer_out[7] = (tfdf->constr_rule<<5) | tfdf->protocol_id;
 		memcpy(&buffer_out[8], tfdf->data, data_length);
 
 #ifdef STM32_MCU
@@ -151,6 +150,11 @@ HAL_StatusTypeDef tf_packet_Packetize(uint8_t data_length, tfph_packet_t *tfph, 
 		buffer_out[data_length + TF_PACKET_PRIMARY_TRUNCATED_HEADER_SIZE + TF_PACKET_DATA_HEADER_SIZE+1] = (calculated_crc & 0xFF00)>>8;
 	}
 
+	buffer_out[0] = (tfph->tfvn<<4) | ((tfph->scid & 0xF000)>>12);
+	buffer_out[1] = (tfph->scid & 0x0FF0)>>4;
+	buffer_out[2] = ((tfph->scid & 0x000F)<<4) | (tfph->source_dest_id<<3) | ((tfph->vcid & 0b111000)>>3);
+	buffer_out[3] = ((tfph->vcid & 0b000111)<<5) | (tfph->mapid<<1) | (tfph->end_flag);
+
 	 return HAL_OK;
 }
 
@@ -161,18 +165,19 @@ HAL_StatusTypeDef tf_packet_SetData(uint8_t *data, uint8_t data_length, uint8_t 
 	if(data_length > TF_PACKET_DATA_MAX_SIZE) 	return HAL_ERROR;
 	if(VCdata_length > TF_PACKET_VCDATA_MAX_SIZE)	return HAL_ERROR;
 
-	memcpy(tfdf->data, data, data_length);
-
 	if(!tfph->end_flag)
 	{
-		memcpy(tfph->vc_frame, VCdata, VCdata_length);
 		tfph->vc_length = VCdata_length;
-
-		tfph->length = data_length + tfph->vc_length + TF_PACKET_PRIMARY_BASE_HEADER_SIZE + TF_PACKET_DATA_HEADER_SIZE + TF_PACKET_ECF_SIZE;
+		tfph->length = data_length + VCdata_length + TF_PACKET_PRIMARY_BASE_HEADER_SIZE + TF_PACKET_DATA_HEADER_SIZE + TF_PACKET_ECF_SIZE;
 
 		if(tfph->length > (TF_PACKET_DATA_MAX_SIZE - (TF_PACKET_PRIMARY_BASE_HEADER_SIZE - TF_PACKET_PRIMARY_TRUNCATED_HEADER_SIZE)) )
 			return HAL_ERROR;
+
+		memcpy(tfph->vc_frame, VCdata, VCdata_length);
+
 	}
+
+	memcpy(tfdf->data, data, data_length);
 
 	return HAL_OK;
 }
@@ -183,15 +188,10 @@ HAL_StatusTypeDef tf_packet_SetData(uint8_t *data, uint8_t data_length, uint8_t 
 #ifdef STM32_MCU
 HAL_StatusTypeDef tf_packet_CRC16CCSDSConfig()
 {
-	HAL_StatusTypeDef err = HAL_OK;
-	err |= HAL_CRCEx_Polynomial_Set(&hcrc, 0x1021, CRC_POLYLENGTH_16B);
-	if(err != HAL_OK)	return err;
-	err |= HAL_CRCEx_Input_Data_Reverse(&hcrc, CRC_INPUTDATA_INVERSION_NONE);
-	if(err != HAL_OK)	return err;
-	err |= HAL_CRCEx_Output_Data_Reverse(&hcrc, CRC_OUTPUTDATA_INVERSION_DISABLE);
-	if(err != HAL_OK)	return err;
-
-	return HAL_OK;
+	if(HAL_CRCEx_Polynomial_Set(&hcrc, 0x1021, CRC_POLYLENGTH_16B) != HAL_OK)					return HAL_ERROR;
+	else if(HAL_CRCEx_Input_Data_Reverse(&hcrc, CRC_INPUTDATA_INVERSION_NONE) != HAL_OK)		return HAL_ERROR;
+	else if(HAL_CRCEx_Output_Data_Reverse(&hcrc, CRC_OUTPUTDATA_INVERSION_DISABLE) != HAL_OK)	return HAL_ERROR;
+	else																						return HAL_OK;
 }
 
 

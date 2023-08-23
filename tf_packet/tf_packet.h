@@ -45,41 +45,65 @@
 #ifndef INC_TF_PACKET_H_
 #define INC_TF_PACKET_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define	STM32_MCU	// Comment this define if crc16 is not computed in STM32 MCU
 
 
 
+
 #ifdef STM32_MCU
 #include "main.h"
-
-extern CRC_HandleTypeDef hcrc;  // Define your own CRC handle
-
 #endif
+
 #include <stdint.h>
 #include <string.h>
 
 
+#ifdef STM32_MCU
+extern CRC_HandleTypeDef hcrc;  // In STM32, define your own CRC handle
+#endif
 
-#define TF_PACKET_MAX_LENGTH					127
+
+#ifndef STM32_MCU
+#define HAL_OK      0x00
+#define HAL_ERROR   0x01
+#define HAL_BUSY    0x02
+#define HAL_TIMEOUT 0x03
+#define HAL_StatusTypeDef uint8_t
+#endif
+
+
+#define TF_PACKET_MAX_SIZE						256
 #define TF_PACKET_ECF_SIZE						2
 #define TF_PACKET_PRIMARY_TRUNCATED_HEADER_SIZE	4
 #define TF_PACKET_PRIMARY_BASE_HEADER_SIZE		7
 #define TF_PACKET_DATA_HEADER_SIZE				1
 #define TF_PACKET_VCDATA_MAX_SIZE				56
-#define TF_PACKET_DATA_MAX_SIZE					(TF_PACKET_MAX_LENGTH-TF_PACKET_PRIMARY_TRUNCATED_HEADER_SIZE-TF_PACKET_DATA_HEADER_SIZE-TF_PACKET_ECF_SIZE)
+#define TF_PACKET_DATA_MAX_SIZE					(TF_PACKET_MAX_SIZE-TF_PACKET_PRIMARY_TRUNCATED_HEADER_SIZE-TF_PACKET_DATA_HEADER_SIZE-TF_PACKET_ECF_SIZE)
 
 
 #define TF_PACKET_TFVN			0b1100
 #define TF_PACKET_DEFAULT_SCID	0x5553
 #define TF_PACKET_DEFAULT_VCID	0b111000
-#define TF_PACKET_DEFAULT_MAP	0b0000
+#define TF_PACKET_DEFAULT_MAPID	0b0000
 
 #define TF_PACKET_SOURCE		0
 #define TF_PACKET_DESTINATION	1
 
 #define TF_PACKET_NOT_TRUNCATED	0
 #define TF_PACKET_TRUNCATED		1
+
+#define TF_PACKET_SEQUENCE_CONTROLLED	0
+#define TF_PACKET_EXPEDITED				1
+
+#define TF_PACKET_USER_DATA		0
+#define TF_PACKET_INFO			1
+
+#define TF_PACKET_OCF_EXIST			0
+#define TF_PACKET_OCF_NOT_EXIST		1
 
 #define TF_PACKET_DEFAULT_PROTOCOL_ID	0b00000000
 #define TF_PACKET_DEFAULT_CONSTR_RULE	0b00000111
@@ -112,17 +136,10 @@ typedef struct
 
 
 
+
+
+
 #ifndef STM32_MCU
-typedef enum
-{
-  HAL_OK       = 0x00,
-  HAL_ERROR    = 0x01,
-  HAL_BUSY     = 0x02,
-  HAL_TIMEOUT  = 0x03
-} HAL_StatusTypeDef;
-
-
-
 uint16_t tf_packet_CRC16CCSDSCalculate(int16_t seed, uint8_t *buf, uint32_t len);
 #else
 HAL_StatusTypeDef tf_packet_CRC16CCSDSConfig();
@@ -133,24 +150,9 @@ HAL_StatusTypeDef tf_packet_Packetize(uint8_t data_length, tfph_packet_t *tfph, 
 HAL_StatusTypeDef tf_packet_SetData(uint8_t *data, uint8_t data_length, uint8_t *VCdata, uint8_t VCdata_length, tfph_packet_t *tfph, tfdf_packet_t *tfdf);
 
 
-
-inline void float2bytes(float value, uint8_t *buffer) {
-    uint8_t *fpointer = (uint8_t *)&value;
-    buffer[0] = fpointer[0];
-    buffer[1] = fpointer[1];
-    buffer[2] = fpointer[2];
-    buffer[3] = fpointer[3];
-}
-
-inline float bytes2float(const uint8_t *buffer) {
-    float value;
-    uint8_t *fpointer = (uint8_t *)&value;
-    fpointer[0] = buffer[0];
-    fpointer[1] = buffer[1];
-    fpointer[2] = buffer[2];
-    fpointer[3] = buffer[3];
-    return value;
-}
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 
 #endif /* INC_TF_PACKET_H_ */
