@@ -39,6 +39,9 @@
 #ifndef INC_BUS_PACKET_H_
 #define INC_BUS_PACKET_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define	STM32_MCU	// Comment this define if crc16 is not computed in STM32 MCU
 
@@ -46,13 +49,25 @@
 
 #ifdef STM32_MCU
 #include "main.h"
-
-extern CRC_HandleTypeDef hcrc;  // Define your own CRC handle
-
 #endif
+
 #include <stdint.h>
 #include <string.h>
 
+
+#ifdef STM32_MCU
+extern CRC_HandleTypeDef hcrc;  // In STM32, define your own CRC handle
+#endif
+
+
+
+#ifndef STM32_MCU
+#define HAL_OK      0x00
+#define HAL_ERROR   0x01
+#define HAL_BUSY    0x02
+#define HAL_TIMEOUT 0x03
+#define HAL_StatusTypeDef uint8_t
+#endif
 
 #define BUS_PACKET_BUS_SIZE			127
 #define BUS_PACKET_ECF_SIZE			2
@@ -67,7 +82,7 @@ typedef struct
 	uint8_t apid;
 	uint8_t ecf_flag;
 	uint8_t length;
-	uint8_t data[123];
+	uint8_t data[BUS_PACKET_DATA_SIZE];
 	uint16_t ecf;
 }bus_packet_t;
 
@@ -81,17 +96,15 @@ typedef enum
 	BUS_PACKET_SYNC_COMPLETED 	= 0b00010000,
 }bus_sync_flag_t;
 
+
+extern const uint8_t BUS_PACKET_FRAME_SYNC[4];
+
+
+
+
+
+
 #ifndef STM32_MCU
-typedef enum
-{
-  HAL_OK       = 0x00,
-  HAL_ERROR    = 0x01,
-  HAL_BUSY     = 0x02,
-  HAL_TIMEOUT  = 0x03
-} HAL_StatusTypeDef;
-
-
-
 uint16_t bus_packet_CRC16CCSDSCalculate(int16_t seed, uint8_t *buf, uint32_t len);
 #else
 HAL_StatusTypeDef bus_packet_CRC16CCSDSConfig();
@@ -102,6 +115,12 @@ HAL_StatusTypeDef bus_packet_Encode(uint8_t type, uint8_t apid, uint8_t ecf_flag
 void bus_packet_Packetize(uint8_t *buffer, bus_packet_t *packet);
 HAL_StatusTypeDef bus_packet_EncodePacketize(uint8_t type, uint8_t apid, uint8_t ecf_flag, uint8_t *data, uint32_t data_length, uint8_t *buffer_out);
 
-bus_sync_flag_t bus_packet_FrameSyncDetect(bus_sync_flag_t flag, uint8_t received_data);
+bus_sync_flag_t bus_packet_SyncFrameDetect(bus_sync_flag_t flag, uint8_t received_data);
+
+
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif /* INC_BUS_PACKET_H_ */

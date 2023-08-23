@@ -39,7 +39,7 @@
 #include "bus_packet.h"
 
 
-uint8_t BUS_PACKET_FRAME_SYNC[4] = {0x1A, 0xCF, 0xFC, 0x1D};
+const uint8_t BUS_PACKET_FRAME_SYNC[4] = {0x1A, 0xCF, 0xFC, 0x1D};
 
 
 
@@ -48,9 +48,12 @@ HAL_StatusTypeDef bus_packet_Decode(uint8_t *buffer, bus_packet_t *packet)
 	uint8_t length = buffer[1] & 0b01111111;
 	uint8_t ecf_flag = (buffer[1] & 0b10000000)>>7;
 
+	if(length-BUS_PACKET_ECF_SIZE-BUS_PACKET_HEADER_SIZE < 0)	return HAL_ERROR;
+
 	if (ecf_flag)	// If there is CRC, check it.
 	{
 		uint8_t crc_data[length];
+		if(length-BUS_PACKET_ECF_SIZE < 0)		return HAL_ERROR;
 		memcpy(crc_data, buffer, length-BUS_PACKET_ECF_SIZE);
 
 #ifdef STM32_MCU
@@ -70,8 +73,7 @@ HAL_StatusTypeDef bus_packet_Decode(uint8_t *buffer, bus_packet_t *packet)
 	packet->ecf_flag = ecf_flag;
 	packet->length = length;
 
-	memcpy(packet->data, &buffer[BUS_PACKET_HEADER_SIZE], packet->length-BUS_PACKET_ECF_SIZE-BUS_PACKET_HEADER_SIZE);
-
+	memcpy(packet->data, &buffer[BUS_PACKET_HEADER_SIZE], length-BUS_PACKET_ECF_SIZE-BUS_PACKET_HEADER_SIZE);
 
 	return HAL_OK;
 }
@@ -161,7 +163,7 @@ HAL_StatusTypeDef bus_packet_EncodePacketize(uint8_t type, uint8_t apid, uint8_t
 
 
 
-bus_sync_flag_t bus_packet_FrameSyncDetect(bus_sync_flag_t flag, uint8_t received_data)
+bus_sync_flag_t bus_packet_SyncFrameDetect(bus_sync_flag_t flag, uint8_t received_data)
 {
   switch(flag)
   {
@@ -207,11 +209,11 @@ bus_sync_flag_t bus_packet_FrameSyncDetect(bus_sync_flag_t flag, uint8_t receive
   {
   	static uint8_t buffer_pos = 0;
   	static bus_sync_flag_t  sync_flag = BUS_PACKET_SYNC_FIND;
-  	static packet_length = 0;
+  	static uint16_t packet_length = 0;
 
   	if (sync_flag != BUS_PACKET_SYNC_COMPLETED)
   	{
-  		sync_flag = detect_frame_sync(sync_flag, buffer_in[buffer_pos]);
+  		sync_flag = bus_packet_SyncFrameDetect(sync_flag, buffer_in[buffer_pos]);
 
   		if(sync_flag == BUS_PACKET_SYNC_COMPLETED)
   		{
@@ -262,15 +264,10 @@ bus_sync_flag_t bus_packet_FrameSyncDetect(bus_sync_flag_t flag, uint8_t receive
 #ifdef STM32_MCU
 HAL_StatusTypeDef bus_packet_CRC16CCSDSConfig()
 {
-	HAL_StatusTypeDef err = HAL_OK;
-	err |= HAL_CRCEx_Polynomial_Set(&hcrc, 0x1021, CRC_POLYLENGTH_16B);
-	if(err != HAL_OK)	return err;
-	err |= HAL_CRCEx_Input_Data_Reverse(&hcrc, CRC_INPUTDATA_INVERSION_NONE);
-	if(err != HAL_OK)	return err;
-	err |= HAL_CRCEx_Output_Data_Reverse(&hcrc, CRC_OUTPUTDATA_INVERSION_DISABLE);
-	if(err != HAL_OK)	return err;
-
-	return HAL_OK;
+	if(HAL_CRCEx_Polynomial_Set(&hcrc, 0x1021, CRC_POLYLENGTH_16B) != HAL_OK)					return HAL_ERROR;
+	else if(HAL_CRCEx_Input_Data_Reverse(&hcrc, CRC_INPUTDATA_INVERSION_NONE) != HAL_OK)		return HAL_ERROR;
+	else if(HAL_CRCEx_Output_Data_Reverse(&hcrc, CRC_OUTPUTDATA_INVERSION_DISABLE) != HAL_OK)	return HAL_ERROR;
+	else																						return HAL_OK;
 }
 
 
