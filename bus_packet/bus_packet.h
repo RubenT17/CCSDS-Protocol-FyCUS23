@@ -75,6 +75,12 @@ extern CRC_HandleTypeDef hcrc;  // In STM32, define your own CRC handle
 #define BUS_PACKET_DATA_SIZE		(BUS_PACKET_BUS_SIZE-BUS_PACKET_ECF_SIZE-BUS_PACKET_HEADER_SIZE)
 #define BUS_PACKET_FRAME_SYNC_SIZE	4
 
+#define BUS_PACKET_TYPE_TM			0
+#define BUS_PACKET_TYPE_TC			1
+
+#define BUS_PACKET_ECF_NOT_EXIST	0
+#define BUS_PACKET_ECF_EXIST		1
+
 
 typedef struct
 {
@@ -117,7 +123,7 @@ HAL_StatusTypeDef bus_packet_EncodePacketize(uint8_t type, uint8_t apid, uint8_t
 
 bus_sync_flag_t bus_packet_SyncFrameDetect(bus_sync_flag_t flag, uint8_t received_data);
 
-
+static inline uint8_t bus_packet_GetLength(uint8_t *buffer) {return buffer[1]&0b01111111;}
 
 #ifdef __cplusplus
 } // extern "C"

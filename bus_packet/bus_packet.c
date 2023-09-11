@@ -52,8 +52,8 @@ HAL_StatusTypeDef bus_packet_Decode(uint8_t *buffer, bus_packet_t *packet)
 
 	if (ecf_flag)	// If there is CRC, check it.
 	{
-		uint8_t crc_data[length];
 		if(length-BUS_PACKET_ECF_SIZE < 0)		return HAL_ERROR;
+		uint8_t crc_data[length-BUS_PACKET_ECF_SIZE];
 		memcpy(crc_data, buffer, length-BUS_PACKET_ECF_SIZE);
 
 #ifdef STM32_MCU
@@ -264,10 +264,20 @@ bus_sync_flag_t bus_packet_SyncFrameDetect(bus_sync_flag_t flag, uint8_t receive
 #ifdef STM32_MCU
 HAL_StatusTypeDef bus_packet_CRC16CCSDSConfig()
 {
-	if(HAL_CRCEx_Polynomial_Set(&hcrc, 0x1021, CRC_POLYLENGTH_16B) != HAL_OK)					return HAL_ERROR;
-	else if(HAL_CRCEx_Input_Data_Reverse(&hcrc, CRC_INPUTDATA_INVERSION_NONE) != HAL_OK)		return HAL_ERROR;
-	else if(HAL_CRCEx_Output_Data_Reverse(&hcrc, CRC_OUTPUTDATA_INVERSION_DISABLE) != HAL_OK)	return HAL_ERROR;
-	else																						return HAL_OK;
+	if(HAL_CRC_DeInit(&hcrc) != HAL_OK)
+			return HAL_ERROR;
+	hcrc.Instance = CRC;
+	hcrc.Init.DefaultPolynomialUse = DEFAULT_POLYNOMIAL_ENABLE;
+	hcrc.Init.DefaultInitValueUse = DEFAULT_INIT_VALUE_DISABLE;
+	hcrc.Init.InitValue = 0;
+	hcrc.Init.InputDataInversionMode = CRC_INPUTDATA_INVERSION_NONE;
+	hcrc.Init.OutputDataInversionMode = CRC_OUTPUTDATA_INVERSION_DISABLE;
+	hcrc.InputDataFormat = CRC_INPUTDATA_FORMAT_BYTES;
+	if (HAL_CRC_Init(&hcrc) != HAL_OK)
+		return HAL_ERROR;
+	if(HAL_CRCEx_Polynomial_Set(&hcrc, 0x1021, CRC_POLYLENGTH_16B) != HAL_OK)
+		return HAL_ERROR;
+	else return HAL_OK;
 }
 
 
