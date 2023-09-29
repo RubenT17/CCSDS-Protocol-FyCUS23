@@ -39,13 +39,22 @@
   *	  	- 8 bits input
   *	  	- Input and output without bit inversion
   *
+  *
+  *  Copyright (C) 2023 Rubén Torres Bermúdez
   ******************************************************************************
   */
 
 #include "tf_packet.h"
 
 
-
+/**
+ * Decode data buffer that contain a Transfer Frame packet
+ * @param buffer_in Data buffer with a TF packet to decode
+ * @param buffer_length Data lenght if TFPH is not truncated
+ * @param tfph Pointer to TFPH structure to save data
+ * @param tfdf Pointer to TFDF structure to save data
+ * @return HAL status
+ */
 HAL_StatusTypeDef tf_packet_Decode(uint8_t *buffer_in, uint32_t buffer_length,  tfph_packet_t *tfph, tfdf_packet_t *tfdf)
 {
 	tfph->tfvn = (buffer_in[0] & 0b11110000)>>4;
@@ -106,7 +115,14 @@ HAL_StatusTypeDef tf_packet_Decode(uint8_t *buffer_in, uint32_t buffer_length,  
 }
 
 
-
+/**
+ * Encode and packetize data into a buffer for to be transmitted
+ * @param data_length data length if truncated TFPH is used
+ * @param tfph Pointer to a TFPH structure to be transmitted
+ * @param tfdf Pointer to a TFDF structure to be transmitted
+ * @param buffer_out Pointer to a data buffer for to be transmitted
+ * @return HAL status
+ */
 HAL_StatusTypeDef tf_packet_Packetize(uint8_t data_length, tfph_packet_t *tfph, tfdf_packet_t *tfdf, uint8_t *buffer_out)
 {
 	buffer_out[0] = (tfph->tfvn<<4) | ((tfph->scid & 0xF000)>>12);
@@ -160,7 +176,16 @@ HAL_StatusTypeDef tf_packet_Packetize(uint8_t data_length, tfph_packet_t *tfph, 
 }
 
 
-
+/**
+ * Set TFPH and TFDF structures to be correctly encoded and packetized
+ * @param data Pointer to data that will be encoded
+ * @param data_length Data length
+ * @param VCdata Pointer to a VC data that will be encoded
+ * @param VCdata_length VC Data length
+ * @param tfph Pointer to a TFPH structure to be set
+ * @param tfdf Pointer to a TFDF structure to be set
+ * @return
+ */
 HAL_StatusTypeDef tf_packet_SetData(uint8_t *data, uint8_t data_length, uint8_t *VCdata, uint8_t VCdata_length, tfph_packet_t *tfph, tfdf_packet_t *tfdf)
 {
 	if(data_length > TF_PACKET_DATA_MAX_SIZE) 	return HAL_ERROR;
@@ -187,6 +212,10 @@ HAL_StatusTypeDef tf_packet_SetData(uint8_t *data, uint8_t data_length, uint8_t 
 
 
 #ifdef STM32_MCU
+/**
+ * Configuration of CRC in a STM32 microcontroller
+ * @return HAL status
+ */
 HAL_StatusTypeDef tf_packet_CRC16CCSDSConfig()
 {
 	if(HAL_CRCEx_Polynomial_Set(&hcrc, 0x1021, CRC_POLYLENGTH_16B) != HAL_OK)					return HAL_ERROR;

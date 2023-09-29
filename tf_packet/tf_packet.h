@@ -39,6 +39,8 @@
   *	  	- 8 bits input
   *	  	- Input and output without bit inversion
   *
+  *
+  *  Copyright (C) 2023 Rubén Torres Bermúdez
   ******************************************************************************
   */
 

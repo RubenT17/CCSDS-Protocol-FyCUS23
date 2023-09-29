@@ -33,6 +33,9 @@
   *	  	- 8 bits input
   *	  	- Input and output without bit inversion
   *
+  *
+  *  Copyright (C) 2023 Rubén Torres Bermúdez
+  *
   ******************************************************************************
   */
 
@@ -42,7 +45,12 @@
 const uint8_t BUS_PACKET_FRAME_SYNC[4] = {0x1A, 0xCF, 0xFC, 0x1D};
 
 
-
+/**
+ * Decode data buffer that contain a bus packet
+ * @param buffer Data buffer with a bus packet to decode
+ * @param packet Pointer to bus packet structure to save data
+ * @return HAL status
+ */
 HAL_StatusTypeDef bus_packet_Decode(uint8_t *buffer, bus_packet_t *packet)
 {
 	uint8_t length = buffer[1] & 0b01111111;
@@ -79,6 +87,20 @@ HAL_StatusTypeDef bus_packet_Decode(uint8_t *buffer, bus_packet_t *packet)
 }
 
 
+/**
+ * Encode data into a bus packet structure
+ * @param type
+ * 		@arg BUS_PACKET_TYPE_TM if a TM data is contained
+ * 		@arg BUS_PACKET_TYPE_TC if a TM data is contained
+ * @param apid APID number for contained data
+ * @param ecf_flag
+ * 		@arg BUS_PACKET_ECF_NOT_EXIST if an Error Control Field will be not encoded
+ * 		@arg BUS_PACKET_ECF_EXIST if an Error Control Field will be encoded
+ * @param data Pointer to data that will be encoded
+ * @param data_length Data length
+ * @param packet Pointer to bus packet structure to save data
+ * @return HAL status
+ */
 HAL_StatusTypeDef bus_packet_Encode(uint8_t type, uint8_t apid, uint8_t ecf_flag, uint8_t *data, uint32_t data_length, bus_packet_t *packet)
 {
 	if((data_length+BUS_PACKET_HEADER_SIZE+BUS_PACKET_ECF_SIZE) > BUS_PACKET_BUS_SIZE)
@@ -114,6 +136,11 @@ HAL_StatusTypeDef bus_packet_Encode(uint8_t type, uint8_t apid, uint8_t ecf_flag
 }
 
 
+/**
+ * Packetize an encoded space packet to be transmitted
+ * @param buffer Pointer to a data buffer for to be transmitted
+ * @param packet Pointer to a space packet to be packetized
+ */
 void bus_packet_Packetize(uint8_t *buffer, bus_packet_t *packet)
 {
 
@@ -134,7 +161,20 @@ void bus_packet_Packetize(uint8_t *buffer, bus_packet_t *packet)
 	buffer[packet->length] = 0;		// String terminator
 }
 
-
+/**
+ * Encode and packetize data into a buffer for to be transmitted
+ * @param type
+ * 		@arg BUS_PACKET_TYPE_TM if a TM data is contained
+ * 		@arg BUS_PACKET_TYPE_TC if a TM data is contained
+ * @param apid APID number for contained data
+ * @param ecf_flag
+ * 		@arg BUS_PACKET_ECF_NOT_EXIST if an Error Control Field will be not encoded
+ * 		@arg BUS_PACKET_ECF_EXIST if an Error Control Field will be encoded
+ * @param data Pointer to data that will be encoded
+ * @param data_length Data length
+ * @param buffer_out Pointer to a data buffer for to be transmitted
+ * @return HAL status
+ */
 HAL_StatusTypeDef bus_packet_EncodePacketize(uint8_t type, uint8_t apid, uint8_t ecf_flag, uint8_t *data, uint32_t data_length, uint8_t *buffer_out)
 {
 	uint32_t length = data_length + BUS_PACKET_HEADER_SIZE + BUS_PACKET_ECF_SIZE;
@@ -162,7 +202,12 @@ HAL_StatusTypeDef bus_packet_EncodePacketize(uint8_t type, uint8_t apid, uint8_t
 }
 
 
-
+/**
+ * Detect next flag sync based on the input flag and input data
+ * @param flag Last flag of your Sync frame
+ * @param received_data Current data received
+ * @return Current flag of your Sync frame
+ */
 bus_sync_flag_t bus_packet_SyncFrameDetect(bus_sync_flag_t flag, uint8_t received_data)
 {
   switch(flag)
@@ -262,6 +307,10 @@ bus_sync_flag_t bus_packet_SyncFrameDetect(bus_sync_flag_t flag, uint8_t receive
 
 
 #ifdef STM32_MCU
+/**
+ * Configuration of CRC in a STM32 microcontroller
+ * @return HAL status
+ */
 HAL_StatusTypeDef bus_packet_CRC16CCSDSConfig()
 {
 	if(HAL_CRC_DeInit(&hcrc) != HAL_OK)
